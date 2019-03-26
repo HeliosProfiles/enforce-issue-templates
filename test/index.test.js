@@ -1,10 +1,9 @@
 const nock = require('nock')
 // Requiring our app implementation
-const myProbotApp = require('..')
+const enforceTemplateApp = require('..')
 const { Probot } = require('probot')
 // Requiring our fixtures
 const payload = require('./fixtures/issues.opened')
-const issueCreatedBody = { body: 'Thanks for opening this issue!' }
 
 nock.disableNetConnect()
 
@@ -14,7 +13,7 @@ describe('My Probot app', () => {
   beforeEach(() => {
     probot = new Probot({})
     // Load our app into probot
-    const app = probot.load(myProbotApp)
+    const app = probot.load(enforceTemplateApp)
 
     // just return a test token
     app.app = () => 'test'
