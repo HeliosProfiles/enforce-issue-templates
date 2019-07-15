@@ -95,7 +95,8 @@ your issue, the more quickly we can begin working on it.
 
 ${headersMessage}
 
-If your issue is not updated to follow a template, it may be removed.
+If your issue is not updated to follow a template, it may be removed. If you edit your issue to 
+follow a template, the bot will remove its comment.
 
 Thanks for your help in improving UserLAnd!
 `
