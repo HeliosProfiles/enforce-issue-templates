@@ -9,7 +9,7 @@ module.exports = app => {
     const { body, labels } = context.payload.issue
     const parsedUserHeaders = parseUserHeaders(body)
     const templates = await getAllTemplateContents(context)
-    await handleIssueEdited(context, labels, parsedUserHeaders, templates, app)
+    await handleIssueEdited(context, labels, parsedUserHeaders, templates)
   })
 }
 
@@ -40,11 +40,11 @@ async function handleIssueOpened(context, user, parsedUserHeaders, templates) {
   postIssueOpenedReply(context, user, templateToUse)
 }
 
-async function handleIssueEdited(context, labels, parsedUserHeaders, templates, app) {
+async function handleIssueEdited(context, labels, parsedUserHeaders, templates) {
   const templateToUse = getTemplateToUse(parsedUserHeaders, templates)
   if (templateToUse != null) return
-  removeLabels(context, labels, app)
-  removeComment(context, app)
+  removeLabels(context, labels)
+  removeComment(context)
 }
 
 function parseTemplateBody(template) {
@@ -125,7 +125,7 @@ async function removeLabels(context, labels) {
   context.github.issues.removeLabel(context.issue({ name: "more-info-required" }))
 }
 
-async function removeComment(context, app) {
+async function removeComment(context) {
   const comments = await context.github.issues.listComments(context.issue())
   comments.data.forEach(async comment => {
     if (comment.user.login == "enforce-issue-templates[bot]") {
