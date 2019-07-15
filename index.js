@@ -1,16 +1,21 @@
 module.exports = app => {
-  app.log("on")
   app.on('issues.opened', async context => {
-    const {body, user} = context.payload.issue
+    const { body, user } = context.payload.issue
     const parsedUserHeaders = parseUserHeaders(body)
     const templates = await getAllTemplateContents(context)
-    await handleUserHeaders(context, user, parsedUserHeaders, templates)
+    await handleIssueOpened(context, user, parsedUserHeaders, templates)
+  })
+  app.on('issues.edited', async context => {
+    const { body, labels } = context.payload.issue
+    const parsedUserHeaders = parseUserHeaders(body)
+    const templates = await getAllTemplateContents(context)
+    await handleIssueEdited(context, labels, parsedUserHeaders, templates, app)
   })
 }
 
 function parseUserHeaders(body) {
   const newlineSeparatedBody = body.replace(/\r\n/g, "\r").replace(/\n/g, "\r").split(/\r/)
-  return newlineSeparatedBody.filter(line => line.includes('#'))
+  return newlineSeparatedBody.filter(line => line.startsWith('#'))
 }
 
 async function getAllTemplateContents(context) {
@@ -29,15 +34,17 @@ async function getAllTemplateContents(context) {
   }))
 }
 
-async function handleUserHeaders(context, user, parsedUserHeaders, templates) {
-  let replyNecessary = true
-  let templateToUse = {}
-  templates.forEach(template => {
-    const {_, headers} = template
-    if (headers.every(header => parsedUserHeaders.includes(header))) replyNecessary = false
-    if (headers.some(header => parsedUserHeaders.includes(header))) templateToUse = template
-  })
-  if (replyNecessary) postMissingHeaders(context, user, templateToUse)
+async function handleIssueOpened(context, user, parsedUserHeaders, templates) {
+  const templateToUse = getTemplateToUse(parsedUserHeaders, templates)
+  if (templateToUse == null) return
+  postIssueOpenedReply(context, user, templateToUse)
+}
+
+async function handleIssueEdited(context, labels, parsedUserHeaders, templates, app) {
+  const templateToUse = getTemplateToUse(parsedUserHeaders, templates)
+  if (templateToUse != null) return
+  removeLabels(context, labels, app)
+  removeComment(context, app)
 }
 
 function parseTemplateBody(template) {
@@ -45,14 +52,25 @@ function parseTemplateBody(template) {
   let headers = []
   for (i = 0; i < newlineSeparated.length; i++) {
     const line = newlineSeparated[i]
-    if (line.includes('#')) {
+    if (line.startsWith('#')) {
       headers.push(line)
     }
   }
   return headers
 }
 
-async function postMissingHeaders(context, user, templateToUse) {
+function getTemplateToUse(parsedUserHeaders, templates) {
+  let replyNecessary = true
+  let templateToUse = {}
+  templates.forEach(template => {
+    const {_, headers} = template
+    if (headers.every(header => parsedUserHeaders.includes(header))) replyNecessary = false
+    if (headers.some(header => parsedUserHeaders.includes(header))) templateToUse = template
+  })
+  return (replyNecessary ? templateToUse : null)
+}
+
+async function postIssueOpenedReply(context, user, templateToUse) {
   const templatesLink = 'https://github.com/CypherpunkArmory/UserLAnd/issues/new/choose'
   const headersMessage = getHeadersMessage(templateToUse)
   const reply = 
@@ -83,7 +101,7 @@ Thanks for your help in improving UserLAnd!
 `
 
   context.github.issues.createComment(context.issue({body: reply}))
-  context.github.issues.addLabels(context.issue({labels: ['more-info-required']}))
+  context.github.issues.addLabels(context.issue({ labels: ['more-info-required'] }))
 }
 
 function getHeadersMessage(templateToUse) {
@@ -100,4 +118,18 @@ That template requires the following headers:\n\n`
     message += `'${header}'\n`
   )
   return message
+}
+
+async function removeLabels(context, labels) {
+  if (labels.filter(label => label.name == "more-info-required").length == 0) return
+  context.github.issues.removeLabel(context.issue({ name: "more-info-required" }))
+}
+
+async function removeComment(context, app) {
+  const comments = await context.github.issues.listComments(context.issue())
+  comments.data.forEach(async comment => {
+    if (comment.user.login == "enforce-issue-templates[bot]") {
+      await context.github.issues.deleteComment(context.issue(comment))
+    }
+  })
 }

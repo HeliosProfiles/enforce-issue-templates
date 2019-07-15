@@ -13,7 +13,6 @@
     "probot-app"
   ],
   "scripts": {
-    "fetchHeaders": "run ./fetchHeaders.js",
     "dev": "nodemon",
     "start": "probot run ./index.js",
     "lint": "standard --fix",
